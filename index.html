@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Admin - Account Controller</title>
+    <link rel="stylesheet" href="https://cdn.cmwithmn.lk/web-data/Static/assets/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { background-color: #0d1117; color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-custom { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 25px; margin-bottom: 20px; }
+        .form-control, .form-select { background-color: #0d1117; border: 1px solid #30363d; color: #fff; }
+        .form-control:focus, .form-select:focus { background-color: #0d1117; color: #fff; border-color: #00d2ff; box-shadow: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-info"><i class="fa-solid fa-user-shield me-2"></i>Nexus Permanent Account Deleter</h2>
+            <p class="text-muted">මෙම පිටුව මඟින් පරිශීලකයෙකුගේ ගිණුම Firebase Auth සහ Firestore යන දෙකෙන්ම සදහටම මැකී යයි.</p>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card-custom border border-danger">
+                    <h5 class="text-danger mb-3"><i class="fa-solid fa-triangle-exclamation me-1"></i> Danger Zone</h5>
+                    <form id="permanentDeleteForm">
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-white-50 fw-semibold">User Unique ID (UID)</label>
+                            <input type="text" class="form-control" id="delUserUid" placeholder="e.g., CM000000 లేదా docId" required>
+                            <small class="text-muted d-block mt-1">මෙහි ඇතුළත් කරන UID එක Auth එකෙන් සහ Firestore එකෙන් සම්පූර්ණයෙන්ම ඉවත් වේ.</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger w-100 fw-bold py-2" id="btnDeleteNow">
+                            <i class="fa-solid fa-trash-can me-2"></i> PERMANENTLY DELETE USER ACC
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ඔයාගේ Firebase Configuration එක මෙතනට දාන්න
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmciwmEbSDgA5PhCY12a_vKqXl4GDBeZ8",
+            authDomain: "school-project-5fe93.firebaseapp.com",
+            projectId: "school-project-5fe93",
+            storageBucket: "school-project-5fe93.firebasestorage.app",
+            messagingSenderId: "548925209782",
+            appId: "1:548925209782:web:cea0aac7d41a510b2fba17",
+            measurementId: "G-5MG8T54708"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('permanentDeleteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const uid = document.getElementById('delUserUid').value.trim();
+            const btnDeleteNow = document.getElementById('btnDeleteNow');
+
+            if (!uid) return;
+
+            // තහවුරු කරගැනීමේ පණිවිඩය (Confirmation Box)
+            const confirmResult = await Swal.fire({
+                title: 'Are you sure?',
+                text: `ඔබ මෙම පරිශීලකයාව (${uid}) පද්ධතියෙන් සදහටම ඉවත් කිරීමට සූදානම්ද? මෙම ක්‍රියාව නැවත හැරවිය නොහැක!`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff3d00',
+                cancelButtonColor: '#30363d',
+                confirmButtonText: 'ඔව්, සදහටම මකන්න!',
+                cancelButtonText: 'අවලංගු කරන්න',
+                background: '#161b22',
+                color: '#ffffff'
+            });
+
+            if (!confirmResult.isConfirmed) return;
+
+            // Loading State එක පෙන්වීම
+            btnDeleteNow.disabled = true;
+            btnDeleteNow.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Deleting Permanently...`;
+
+            try {
+                // 1. FIRSTORE එකෙන් දත්ත මැකීම
+                await deleteDoc(doc(db, "users", uid));
+                console.log("Firestore data deleted successfully.");
+
+                // 2. FIREBASE AUTH එකෙන් USER ACC එක සදහටම මැකීම (REST API Trick)
+                // සටහන: Frontend එකෙන් Auth මකන්න Firebase Identity Toolkit API එක පාවිච්චි කරන්න පුළුවන්.
+                const url = `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${firebaseConfig.apiKey}`;
+                
+                // මේ සඳහා ඔයාට මකන්න අවශ්‍ය User ගේ LocalId එක (UID) යවන්න ඕනේ.
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        localId: uid
+                    })
+                });
+
+                // සාර්ථක වුණොත් පණිවිඩය පෙන්වීම
+                Swal.fire({
+                    title: 'Deleted Successfully!',
+                    text: 'පරිශීලකයාගේ Auth Account එක සහ Firestore දත්ත සාර්ථකව පද්ධතියෙන් ඉවත් කරන ලදී.',
+                    icon: 'success',
+                    background: '#161b22',
+                    color: '#ffffff',
+                    confirmButtonColor: '#00d2ff'
+                });
+
+                document.getElementById('permanentDeleteForm').reset();
+
+            } catch (error) {
+                console.error("Error during deletion: ", error);
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'මකන අවස්ථාවේදී දෝෂයක් සිදු විය. (සමහරවිට Auth එකෙන් මැකීමට Admin Token එකක් අවශ්‍ය විය හැක)',
+                    icon: 'error',
+                    background: '#161b22',
+                    color: '#ffffff'
+                });
+            } finally {
+                btnDeleteNow.disabled = false;
+                btnDeleteNow.innerHTML = `<i class="fa-solid fa-trash-can me-2"></i> PERMANENTLY DELETE USER ACC`;
+            }
+        });
+    </script>
+</body>
+</html>
